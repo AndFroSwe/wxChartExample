@@ -10,9 +10,17 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(wxWidgets COMPONENTS base core REQUIRED)
 
+add_library(ChartView ChartView.cpp)
+target_link_libraries(ChartView
+  PUBLIC ${wxWidgets_LIBRARIES}
+)
+target_include_directories(ChartView
+   PUBLIC ${wxWidgets_INCLUDE_DIRS}
+)
+
 add_executable(ChartApp WIN32 ChartApp.cpp)
 target_link_libraries(ChartApp
-  PRIVATE ${wxWidgets_LIBRARIES}
+  PRIVATE ${wxWidgets_LIBRARIES} ChartView
 )
 target_include_directories(ChartApp
    PRIVATE ${wxWidgets_INCLUDE_DIRS}
