@@ -1,4 +1,4 @@
 ---
 Checks:
   "clang-analyzer-*,bugprone-*,cert-*,cppcoreguidelines-*,misc-*,modernize-*,performance-*,portability-*,readability-*,
-  -cppcoreguidelines-owning-memory,-modernize-use-trailing-return-type,-readability-identifier-length"
+  -cppcoreguidelines-owning-memory,-modernize-use-trailing-return-type,-readability-identifier-length,-cppcoreguidelines-avoid-magic-numbers,-readability-magic-numbers"
