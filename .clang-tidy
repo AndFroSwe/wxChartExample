@@ -1,0 +1,4 @@
+---
+Checks:
+  "clang-analyzer-*,bugprone-*,cert-*,cppcoreguidelines-*,misc-*,modernize-*,performance-*,portability-*,readability-*,
+  -cppcoreguidelines-owning-memory,-modernize-use-trailing-return-type,-readability-identifier-length"
