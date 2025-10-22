@@ -7,6 +7,7 @@ class ChartApp : public wxApp {
   bool OnInit() override;
 };
 
+// NOLINTNEXTLINE
 wxIMPLEMENT_APP(ChartApp);
 
 bool ChartApp::OnInit() {
@@ -18,8 +19,8 @@ bool ChartApp::OnInit() {
   std::vector<double> xs(1000);
   std::vector<double> ys(xs.size());
   for (size_t i = 0; i < xs.size(); i++) {
-    xs[i] = 0.01 * i;
-    ys[i] = sin(xs[i]);
+    xs[i] = 0.01 * static_cast<float>(i);
+    ys[i] = (5 * sin(xs[i])) + 2.1;
   }
   auto res = view->SetPlotData(xs, ys);
   if (!res) {

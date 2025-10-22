@@ -3,7 +3,10 @@
 #include <wx/wx.h>
 
 #include "expected.hpp"
+#include "wx/affinematrix2d.h"
 #include "wx/dcbuffer.h"
+#include "wx/event.h"
+#include "wx/timer.h"
 
 namespace chartview {
 struct margins {
@@ -37,9 +40,17 @@ private:
   chartview::margins m_margins;
 
   std::vector<chartview::point> m_points;
-  std::pair<double, double> m_x_minmax;
-  std::pair<double, double> m_y_minmax;
+  std::pair<double, double> m_xMinmax;
+  std::pair<double, double> m_yMinmax;
+  bool m_isResizing;
+  wxTimer m_timerResize;
+
+  wxAffineMatrix2D m_pointsToPlotarea;
+
+  void DrawPlot(wxAutoBufferedPaintDC &dc);
+  void CalculateTransforms();
 
   void OnPaint(wxPaintEvent &evt);
-  void DrawPlot(wxAutoBufferedPaintDC &dc);
+  void OnResize(wxSizeEvent &evt);
+  void OnResizeTimer(wxTimerEvent &evt);
 };

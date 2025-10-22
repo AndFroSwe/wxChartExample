@@ -9,16 +9,23 @@
 #include <format>
 
 ChartView::ChartView(wxWindow *parent, wxWindowID id, const wxString &title)
-    : wxFrame(parent, id, title), m_margins(), m_points(0), m_x_minmax(0, 0),
-      m_y_minmax(0, 0) {
+    : wxFrame(parent, id, title), m_margins(), m_points(0), m_xMinmax(0, 0),
+      m_yMinmax(0, 0), m_isResizing(false) {
   SetBackgroundStyle(wxBG_STYLE_PAINT); // Needed for windows
 
   // Set default margins
-  // NOLINTNEXTLINE
   auto res = SetMargins({.left = 0.1, .top = 0.1, .right = 0.1, .bottom = 0.1});
   assert(res && "Default margins are not in span!");
 
+  CalculateTransforms(); // Make first calc on start
+
+  // Bindings
   this->Bind(wxEVT_PAINT, &ChartView::OnPaint, this);
+  this->Bind(wxEVT_SIZE, &ChartView::OnResize, this);
+
+  m_timerResize.SetOwner(this);
+  this->Bind(wxEVT_TIMER, &ChartView::OnResizeTimer, this,
+             m_timerResize.GetId());
 }
 
 tl::expected<void, std::string>
@@ -56,11 +63,6 @@ chartview::margins ChartView::GetMargins() const {
   return m_margins;
 }
 
-void ChartView::OnPaint(wxPaintEvent & /*evt*/) {
-  wxAutoBufferedPaintDC dc(this);
-  DrawPlot(dc);
-}
-
 tl::expected<void, std::string>
 ChartView::SetPlotData(const std::vector<double> &xs,
                        const std::vector<double> &ys) {
@@ -92,8 +94,8 @@ ChartView::SetPlotData(const std::vector<double> &xs,
   }
 
   m_points = std::move(tmp);
-  m_x_minmax = std::move(_xmax);
-  m_y_minmax = std::move(_ymax);
+  m_xMinmax = std::move(_xmax);
+  m_yMinmax = std::move(_ymax);
 
   return {};
 }
@@ -108,43 +110,84 @@ void ChartView::DrawPlot(wxAutoBufferedPaintDC &dc) {
   bool aaSupported = gc->SetAntialiasMode(wxAntialiasMode::wxANTIALIAS_DEFAULT);
 
   auto currentSize = this->GetSize();
-
   wxRect2DDouble fullArea(0, 0, static_cast<double>(currentSize.GetWidth()),
                           static_cast<double>(currentSize.GetHeight()));
   wxRect2DDouble plotArea = fullArea;
+  // NOLINTBEGIN Ignore narrowing conversion warning
   plotArea.Inset(fullArea.GetSize().GetWidth() * m_margins.left,
                  fullArea.GetSize().GetHeight() * m_margins.top,
                  fullArea.GetSize().GetWidth() * m_margins.right,
                  fullArea.GetSize().GetHeight() * m_margins.bottom);
+  // NOLINTEND
 
   gc->SetBrush(*wxWHITE_BRUSH);
   gc->SetPen(*wxBLACK_PEN);
   gc->DrawRectangle(plotArea);
 
-  // Transform points to plot area
-  wxAffineMatrix2D pointsToPlotarea;
-  pointsToPlotarea.Translate(plotArea.GetX(),
-                             plotArea.GetY() + plotArea.GetHeight());
-  pointsToPlotarea.Scale(
-      plotArea.GetWidth() / (m_x_minmax.second - m_x_minmax.first),
-      plotArea.GetHeight() / (m_y_minmax.second - m_y_minmax.first));
-  pointsToPlotarea.Scale(1, -1);
-  pointsToPlotarea.Translate(-m_x_minmax.first, -m_y_minmax.first);
+  // Only draw graph when not resizing
+  if (m_isResizing) {
+    return;
+  }
 
   wxPen plotPen;
   plotPen.SetColour(*wxBLUE);
 
   gc->SetPen(plotPen);
   gc->SetBrush(wxNullBrush);
-  std::vector<wxPoint2DDouble> points;
 
   auto path = gc->CreatePath();
   for (auto &point : m_points) {
     double x = point.x;
     double y = point.y;
-    pointsToPlotarea.TransformPoint(&x, &y);
+    m_pointsToPlotarea.TransformPoint(&x, &y);
     path.AddLineToPoint(x, y);
   }
 
   gc->DrawPath(path);
+}
+
+void ChartView::CalculateTransforms() {
+  auto currentSize = this->GetSize();
+
+  wxRect2DDouble fullArea(0, 0, static_cast<double>(currentSize.GetWidth()),
+                          static_cast<double>(currentSize.GetHeight()));
+
+  wxRect2DDouble plotArea = fullArea;
+  // NOLINTBEGIN Ignore narrowing conversion warning
+  plotArea.Inset(fullArea.GetSize().GetWidth() * m_margins.left,
+                 fullArea.GetSize().GetHeight() * m_margins.top,
+                 fullArea.GetSize().GetWidth() * m_margins.right,
+                 fullArea.GetSize().GetHeight() * m_margins.bottom);
+  // NOLINTEND
+
+  // Transform points to plot area
+  wxAffineMatrix2D transformationMatrix;
+  transformationMatrix.Translate(plotArea.GetX(),
+                                 plotArea.GetY() + plotArea.GetHeight());
+  transformationMatrix.Scale(
+      plotArea.GetWidth() / (m_xMinmax.second - m_xMinmax.first),
+      plotArea.GetHeight() / (m_yMinmax.second - m_yMinmax.first));
+  transformationMatrix.Scale(1, -1);
+  transformationMatrix.Translate(-m_xMinmax.first, -m_yMinmax.first);
+  m_pointsToPlotarea = std::move(transformationMatrix);
+}
+
+void ChartView::OnResizeTimer(wxTimerEvent & /*evt*/) {
+  m_isResizing = false;
+  CalculateTransforms();
+  Refresh();
+}
+
+void ChartView::OnResize(wxSizeEvent &evt) {
+  m_isResizing = true;
+  m_timerResize.StartOnce(100);
+
+  evt.Skip();
+}
+
+void ChartView::OnPaint(wxPaintEvent &evt) {
+  wxAutoBufferedPaintDC dc(this);
+  DrawPlot(dc);
+
+  evt.Skip();
 }
