@@ -48,7 +48,6 @@ private:
   wxAffineMatrix2D m_pointsToPlotarea;
 
   void DrawPlot(wxAutoBufferedPaintDC &dc);
-  void CalculateTransforms();
 
   static std::tuple<int, double, double> NiceLabels(double origLow,
                                                     double origHigh);

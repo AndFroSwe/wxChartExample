@@ -202,35 +202,8 @@ std::tuple<int, double, double> ChartView::NiceLabels(double origLow,
   return std::make_tuple(10, origLow, origHigh);
 }
 
-void ChartView::CalculateTransforms() {
-  auto currentSize = this->GetSize();
-
-  wxRect2DDouble fullArea(0, 0, static_cast<double>(currentSize.GetWidth()),
-                          static_cast<double>(currentSize.GetHeight()));
-
-  wxRect2DDouble plotArea = fullArea;
-  // NOLINTBEGIN Ignore narrowing conversion warning
-  plotArea.Inset(fullArea.GetSize().GetWidth() * m_margins.left,
-                 fullArea.GetSize().GetHeight() * m_margins.top,
-                 fullArea.GetSize().GetWidth() * m_margins.right,
-                 fullArea.GetSize().GetHeight() * m_margins.bottom);
-  // NOLINTEND
-
-  // Transform points to plot area
-  wxAffineMatrix2D transformationMatrix;
-  transformationMatrix.Translate(plotArea.GetX(),
-                                 plotArea.GetY() + plotArea.GetHeight());
-  transformationMatrix.Scale(
-      plotArea.GetWidth() / (m_xMinmax.second - m_xMinmax.first),
-      plotArea.GetHeight() / (m_yMinmax.second - m_yMinmax.first));
-  transformationMatrix.Scale(1, -1);
-  transformationMatrix.Translate(-m_xMinmax.first, -m_yMinmax.first);
-  m_pointsToPlotarea = std::move(transformationMatrix);
-}
-
 void ChartView::OnResizeTimer(wxTimerEvent & /*evt*/) {
   m_isResizing = false;
-  CalculateTransforms();
   Refresh();
 }
 
