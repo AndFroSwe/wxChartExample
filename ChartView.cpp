@@ -6,6 +6,7 @@
 #include "wx/geometry.h"
 #include "wx/graphics.h"
 #include <algorithm>
+#include <array>
 #include <format>
 
 ChartView::ChartView(wxWindow *parent, wxWindowID id, const wxString &title)
@@ -107,6 +108,8 @@ void ChartView::Clear() {
 void ChartView::DrawPlot(wxAutoBufferedPaintDC &dc) {
   dc.Clear();
   std::unique_ptr<wxGraphicsContext> gc(wxGraphicsContext::Create(dc));
+  assert(gc && "failed to create Graphicscontext");
+
   bool aaSupported = gc->SetAntialiasMode(wxAntialiasMode::wxANTIALIAS_DEFAULT);
 
   auto currentSize = this->GetSize();
@@ -129,6 +132,35 @@ void ChartView::DrawPlot(wxAutoBufferedPaintDC &dc) {
     return;
   }
 
+  // Draw axis
+  auto [segs, newMin, newMax] = NiceLabels(m_yMinmax.first, m_yMinmax.second);
+
+  if (segs > 1) {
+    gc->SetPen(*wxGREY_PEN);
+    for (size_t i = 0; i < segs; i++) {
+
+      double y = plotArea.GetY() +
+                 (plotArea.GetHeight() * (1.0 - (double)i / (segs - 1)));
+      std::array<wxPoint2DDouble, 2> points{
+          wxPoint2DDouble(plotArea.GetX(), y),
+          wxPoint2DDouble(plotArea.GetRight(), y)};
+      gc->StrokeLines(points.size(), points.data());
+    }
+  } else {
+    newMin = m_yMinmax.first;
+    newMax = m_yMinmax.second;
+  }
+
+  // Transform points to plot area
+  wxAffineMatrix2D transformationMatrix;
+  transformationMatrix.Translate(plotArea.GetX(),
+                                 plotArea.GetY() + plotArea.GetHeight());
+  transformationMatrix.Scale(plotArea.GetWidth() /
+                                 (m_xMinmax.second - m_xMinmax.first),
+                             plotArea.GetHeight() / (newMax - newMin));
+  transformationMatrix.Scale(1, -1);
+  transformationMatrix.Translate(-m_xMinmax.first, -m_yMinmax.first);
+
   wxPen plotPen;
   plotPen.SetColour(*wxBLUE);
 
@@ -139,11 +171,35 @@ void ChartView::DrawPlot(wxAutoBufferedPaintDC &dc) {
   for (auto &point : m_points) {
     double x = point.x;
     double y = point.y;
-    m_pointsToPlotarea.TransformPoint(&x, &y);
+    transformationMatrix.TransformPoint(&x, &y);
     path.AddLineToPoint(x, y);
   }
 
   gc->DrawPath(path);
+}
+
+std::tuple<int, double, double> ChartView::NiceLabels(double origLow,
+                                                      double origHigh) {
+  constexpr std::array<double, 7> rangeMults{0.2, 0.25, 0.5, 1.0,
+                                             2.0, 2.5,  5.0};
+  constexpr int maxSegments = 6;
+
+  double magnitude = std::floor(std::log10(origHigh - origLow));
+
+  for (auto r : rangeMults) {
+    double stepSize = r * std::pow(10.0, magnitude);
+    double low = std::floor(origLow / stepSize) * stepSize;
+    double high = std::ceil(origHigh / stepSize) * stepSize;
+
+    auto segments = static_cast<int>(round((high - low) / stepSize));
+
+    if (segments <= maxSegments) {
+      return std::make_tuple(segments, low, high);
+    }
+  }
+
+  // return some defaults in case rangeMults and maxSegments are mismatched
+  return std::make_tuple(10, origLow, origHigh);
 }
 
 void ChartView::CalculateTransforms() {

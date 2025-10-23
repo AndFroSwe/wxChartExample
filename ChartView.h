@@ -50,6 +50,9 @@ private:
   void DrawPlot(wxAutoBufferedPaintDC &dc);
   void CalculateTransforms();
 
+  static std::tuple<int, double, double> NiceLabels(double origLow,
+                                                    double origHigh);
+
   void OnPaint(wxPaintEvent &evt);
   void OnResize(wxSizeEvent &evt);
   void OnResizeTimer(wxTimerEvent &evt);
